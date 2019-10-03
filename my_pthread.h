@@ -24,6 +24,18 @@ typedef struct threadControlBlock{
   struct threadControlBlock* next;
 } my_pthread_tcb;
 
+// nodes of queue
+typedef struct queue_node {
+	my_pthread_t thread;
+	struct queue_node *next;
+} queue_node;
+
+// queue of queueNodes
+typedef struct queue {
+	queue_node *head;
+	queue_node *tail;
+	int size;
+} queue;
 
 /* Function Declarations */
 void my_pthread_create(my_pthread_t *thread, void*(*function)(void*), void *arg);
