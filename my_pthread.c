@@ -6,13 +6,12 @@
 #define STACK_SIZE 32768
 
 
-
 // static variables
 static my_pthread_t tid_counter = 0;
 static my_pthread_tcb tcbs[500];
-int activated = -1;
-struct sigaction sa;
-struct itimerval timer;
+static int activated = -1;
+static struct sigaction sa;
+static struct itimerval timer;
 static queue *thread_queue;
 
 
@@ -32,45 +31,42 @@ void schedule(int signum){
 
   // Implement Here
 
-  /*
+/*
   static int count = 0;
   printf("timer expired %d times\n", ++count);
-  */
-
-/*
-  printf("%d ", thread_queue->head->thread);
-  ucontext_t oucp = tcbs[thread_queue->head->thread].context;
-  printf("%d\n", oucp);
-
-  printf("%d ", thread_queue->head->next->thread);
-  ucontext_t ucp = tcbs[thread_queue->head->next->thread].context;
-  printf("%d\n", ucp);
-  */
+*/
+  printf("%d %d\n", thread_queue->head->thread, thread_queue->head->next->thread);
 
 
+  sigset_t signal_set;
+  sigemptyset(&signal_set);
+  sigaddset(&signal_set, SIGPROF);
+  sigprocmask(SIG_BLOCK, &signal_set, NULL);
 
+  int curr = thread_queue->head->next->thread;
+  int next = thread_queue->head->thread;
 
-  /*swapcontext(ucontext_t *oucp, const ucontext_t *ucp)
-  This function saves the current execution context into the context pointed to by oucp and starts
-  resumes the execution context of the ucontext pointed to by ucp*/
-
-  ucontext_t oucp = tcbs[thread_queue->head->thread].context;
-  ucontext_t ucp = tcbs[thread_queue->head->next->thread].context;
-  swapcontext(&oucp, &ucp);
   my_pthread_t temp = dequeue(thread_queue);
   enqueue(thread_queue, temp);
+
+//  ucontext_t ucp = tcbs[curr].context; // new current context
+//  ucontext_t oucp = tcbs[next].context;
+  swapcontext(&tcbs[next].context, &tcbs[curr].context);
+
+
+  sigprocmask(SIG_UNBLOCK, &signal_set, NULL);
 
 }
 
 void timer_init() {
   memset(&sa, 0, sizeof (sa));
   sa.sa_handler = &schedule;
-  sigaction (SIGVTALRM, &sa, NULL);
+  sigaction (SIGPROF, &sa, NULL);
   timer.it_value.tv_sec = 0;
   timer.it_value.tv_usec = TIME_QUANTUM_MS;
   timer.it_interval.tv_sec = 0;
   timer.it_interval.tv_usec = TIME_QUANTUM_MS;
-  setitimer (ITIMER_VIRTUAL, &timer, NULL);
+  setitimer (ITIMER_PROF, &timer, NULL);
 }
 
 
@@ -97,16 +93,18 @@ void my_pthread_create(my_pthread_t *thread, void*(*function)(void*), void *arg)
   }
 
   ucontext_t ucp;
+  getcontext(&ucp);
   void *stack = malloc(STACK_SIZE);
   ucp.uc_link = NULL;
   ucp.uc_stack.ss_sp = stack;
   ucp.uc_stack.ss_size = STACK_SIZE;
   ucp.uc_stack.ss_flags = 0;
-  makecontext(&ucp, (void*)(&function), 0);
+  makecontext(&ucp, (void*)(function), 0);
 
   my_pthread_tcb tcb = {tid_counter, RUNNABLE, ucp, NULL};
   tcbs[tid_counter] = tcb;
   enqueue(thread_queue, tid_counter);
+
   tid_counter++;
 
 }
@@ -134,8 +132,7 @@ void my_pthread_join(my_pthread_t thread){
 my_pthread_t my_pthread_self(){
 
   // Implement Here //
-
-  return 0; // temporary return, replace this
+  return thread_queue->head->thread; // temporary return, replace this
 
 }
 
@@ -172,7 +169,6 @@ void enqueue(queue *q, my_pthread_t thread) {
 		q->tail = new_node;
 		(q-> size)++;
 	}
-
 }
 
 my_pthread_t dequeue(queue *q) {
