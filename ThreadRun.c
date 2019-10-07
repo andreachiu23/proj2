@@ -4,11 +4,13 @@
 
 void thread_run(){
   while(1){
+
     printf("Thread Running %d\n", my_pthread_self());
-    // printf("Thread running\n");
+
   }
 }
 
+static int test = -1;
 int main(){
 
   my_pthread_t thread;
@@ -18,7 +20,7 @@ int main(){
 
   while(1) {
 
-    printf("Main Thread Running\n");
+      printf("Main Thread Running\n");
 
   }
 

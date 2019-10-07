@@ -35,26 +35,30 @@ void schedule(int signum){
   static int count = 0;
   printf("timer expired %d times\n", ++count);
 */
-  printf("%d %d\n", thread_queue->head->thread, thread_queue->head->next->thread);
 
+sigset_t block_mask;
+sigemptyset (&block_mask);
+sigaddset (&block_mask, SIGPROF);
+sigprocmask (SIG_BLOCK, &block_mask, NULL);
 
-  sigset_t signal_set;
-  sigemptyset(&signal_set);
-  sigaddset(&signal_set, SIGPROF);
-  sigprocmask(SIG_BLOCK, &signal_set, NULL);
+if (thread_queue->head->next != NULL) {
 
-  int curr = thread_queue->head->next->thread;
-  int next = thread_queue->head->thread;
+  int next = thread_queue->head->next->thread;
+  int curr = thread_queue->head->thread;
 
   my_pthread_t temp = dequeue(thread_queue);
-  enqueue(thread_queue, temp);
+  if(tcbs[curr].status == RUNNABLE) {
+    sigprocmask (SIG_UNBLOCK, &block_mask, NULL);
+    enqueue(thread_queue, temp);
+    swapcontext(&tcbs[curr].context, &tcbs[next].context);
+  }
+  else {
+    sigprocmask (SIG_UNBLOCK, &block_mask, NULL);
+    swapcontext(&tcbs[curr].context, &tcbs[next].context);
+  }
 
-//  ucontext_t ucp = tcbs[curr].context; // new current context
-//  ucontext_t oucp = tcbs[next].context;
-  swapcontext(&tcbs[next].context, &tcbs[curr].context);
+}
 
-
-  sigprocmask(SIG_UNBLOCK, &signal_set, NULL);
 
 }
 
@@ -104,7 +108,6 @@ void my_pthread_create(my_pthread_t *thread, void*(*function)(void*), void *arg)
   my_pthread_tcb tcb = {tid_counter, RUNNABLE, ucp, NULL};
   tcbs[tid_counter] = tcb;
   enqueue(thread_queue, tid_counter);
-
   tid_counter++;
 
 }
@@ -114,6 +117,14 @@ void my_pthread_create(my_pthread_t *thread, void*(*function)(void*), void *arg)
 void my_pthread_yield(){
 
   // Implement Here
+  sigset_t block_mask;
+  sigemptyset (&block_mask);
+  sigaddset (&block_mask, SIGPROF);
+  sigprocmask (SIG_BLOCK, &block_mask, NULL);
+
+  schedule(1);
+
+  sigprocmask (SIG_UNBLOCK, &block_mask, NULL);
 
 }
 
@@ -123,6 +134,16 @@ void my_pthread_yield(){
 void my_pthread_join(my_pthread_t thread){
 
   // Implement Here //
+  sigset_t block_mask;
+  sigemptyset (&block_mask);
+  sigaddset (&block_mask, SIGPROF);
+  sigprocmask (SIG_BLOCK, &block_mask, NULL);
+
+  if (tcbs[thread].status != FINISHED) {
+    my_pthread_yield();
+  }
+
+  sigprocmask (SIG_UNBLOCK, &block_mask, NULL);
 
 }
 
@@ -142,6 +163,16 @@ my_pthread_t my_pthread_self(){
 void my_pthread_exit(){
 
   // Implement Here //
+
+  sigset_t block_mask;
+  sigemptyset (&block_mask);
+  sigaddset (&block_mask, SIGPROF);
+  sigprocmask (SIG_BLOCK, &block_mask, NULL);
+
+  tcbs[my_pthread_self()].status = FINISHED;
+  schedule(0);
+
+  sigprocmask (SIG_UNBLOCK, &block_mask, NULL);
 
 }
 
