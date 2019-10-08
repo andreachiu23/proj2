@@ -14,15 +14,10 @@ static struct sigaction sa;
 static struct itimerval timer;
 static queue *thread_queue;
 
-
 void queue_init(queue *q);
 void enqueue(queue *q, my_pthread_t thread);
 my_pthread_t dequeue(queue *q);
-void print_queue(queue *q);
 
-
-/* Scheduler State */
- // Fill in Here //
 
 
 /* Scheduler Function
@@ -31,29 +26,33 @@ void print_queue(queue *q);
 void schedule(int signum){
 
   // Implement Here
+  sigset_t block_mask;
+  sigemptyset (&block_mask);
+  sigaddset (&block_mask, SIGPROF);
+  sigprocmask (SIG_BLOCK, &block_mask, NULL);
 
-sigset_t block_mask;
-sigemptyset (&block_mask);
-sigaddset (&block_mask, SIGPROF);
-sigprocmask (SIG_BLOCK, &block_mask, NULL);
 
-if (thread_queue->head->next != NULL) {
-  int next = thread_queue->head->next->thread;
-  int curr = thread_queue->head->thread;
+  if (thread_queue->head->next != NULL) {
 
-  my_pthread_t temp = dequeue(thread_queue);
-  if(tcbs[curr].status == RUNNABLE) {
-    sigprocmask (SIG_UNBLOCK, &block_mask, NULL);
-    enqueue(thread_queue, temp);
-    swapcontext(&tcbs[curr].context, &tcbs[next].context);
+    int next = thread_queue->head->next->thread; // next runnable thread
+    int curr = thread_queue->head->thread; // currently running thread
+
+    my_pthread_t temp = dequeue(thread_queue);
+
+    // case 1. curr is not done, put it back on the END of the queue
+    if(tcbs[curr].status == RUNNABLE) {
+      sigprocmask (SIG_UNBLOCK, &block_mask, NULL);
+      enqueue(thread_queue, temp);
+      swapcontext(&tcbs[curr].context, &tcbs[next].context);
+    }
+
+    // case 2. exit was called- curr's status is marked as FINISHED --> do NOT put it back on the queue
+    else {
+      sigprocmask (SIG_UNBLOCK, &block_mask, NULL);
+      swapcontext(&tcbs[curr].context, &tcbs[next].context);
+    }
+
   }
-  else {
-    sigprocmask (SIG_UNBLOCK, &block_mask, NULL);
-    swapcontext(&tcbs[curr].context, &tcbs[next].context);
-  }
-
-}
-
 
 }
 
@@ -75,7 +74,7 @@ void timer_init() {
  */
 void my_pthread_create(my_pthread_t *thread, void*(*function)(void*), void *arg){
 
-  // Implement Here
+  // first time my_pthread_create is called (only happens once) --> start timer, initiate queue, and instantiate main as tid 0
   if (activated == -1) {
     ucontext_t main;
     getcontext(&main);
@@ -112,12 +111,12 @@ void my_pthread_create(my_pthread_t *thread, void*(*function)(void*), void *arg)
  */
 void my_pthread_yield(){
 
-  // Implement Here
   sigset_t block_mask;
   sigemptyset (&block_mask);
   sigaddset (&block_mask, SIGPROF);
   sigprocmask (SIG_BLOCK, &block_mask, NULL);
 
+  // immediately call scheduler once yield is called --> nothing after caller's yield statement is executed
   schedule(1);
 
   sigprocmask (SIG_UNBLOCK, &block_mask, NULL);
@@ -129,12 +128,12 @@ void my_pthread_yield(){
  */
 void my_pthread_join(my_pthread_t thread){
 
-  // Implement Here //
   sigset_t block_mask;
   sigemptyset (&block_mask);
   sigaddset (&block_mask, SIGPROF);
   sigprocmask (SIG_BLOCK, &block_mask, NULL);
 
+  // call yield so that nothing after join caller's yield statement executes until 'thread' IS finished
   while (tcbs[thread].status != FINISHED) {
     my_pthread_yield();
   }
@@ -148,8 +147,8 @@ void my_pthread_join(my_pthread_t thread){
  */
 my_pthread_t my_pthread_self(){
 
-  // Implement Here //
-  return thread_queue->head->thread; // temporary return, replace this
+  // head of queue is always the currently running thread
+  return thread_queue->head->thread;
 
 }
 
@@ -158,13 +157,12 @@ my_pthread_t my_pthread_self(){
  */
 void my_pthread_exit(){
 
-  // Implement Here //
-
   sigset_t block_mask;
   sigemptyset (&block_mask);
   sigaddset (&block_mask, SIGPROF);
   sigprocmask (SIG_BLOCK, &block_mask, NULL);
 
+  // mark curr thread's status as 'finished' and call scheduler, which will catch this status and handle it accordingly
   tcbs[my_pthread_self()].status = FINISHED;
   schedule(0);
 
@@ -173,14 +171,8 @@ void my_pthread_exit(){
 }
 
 
-void print_queue(queue *q) {
-  queue_node *ptr = q->head;
-  while (ptr != NULL) {
-    printf("%d -> ", ptr->thread);
-    ptr = ptr->next;
-  }
-  printf("\n");
-}
+
+// QUEUE helper methods
 
 void queue_init(queue *q) {
 	q -> head = NULL;
@@ -216,5 +208,4 @@ my_pthread_t dequeue(queue *q) {
   q->head = new_front;
   (q->size)--;
   return removed;
-
 }
