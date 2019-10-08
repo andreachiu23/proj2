@@ -6,6 +6,7 @@ void thread_run(){
   while(1){
 
     printf("Thread Running %d\n", my_pthread_self());
+    my_pthread_exit();
 
   }
 }
@@ -20,7 +21,7 @@ int main(){
 
   while(1) {
 
-      printf("Main Thread Running\n");
+      //printf("Main Thread Running\n");
 
   }
 

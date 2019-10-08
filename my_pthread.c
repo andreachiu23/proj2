@@ -18,6 +18,7 @@ static queue *thread_queue;
 void queue_init(queue *q);
 void enqueue(queue *q, my_pthread_t thread);
 my_pthread_t dequeue(queue *q);
+void print_queue(queue *q);
 
 
 /* Scheduler State */
@@ -31,18 +32,12 @@ void schedule(int signum){
 
   // Implement Here
 
-/*
-  static int count = 0;
-  printf("timer expired %d times\n", ++count);
-*/
-
 sigset_t block_mask;
 sigemptyset (&block_mask);
 sigaddset (&block_mask, SIGPROF);
 sigprocmask (SIG_BLOCK, &block_mask, NULL);
 
 if (thread_queue->head->next != NULL) {
-
   int next = thread_queue->head->next->thread;
   int curr = thread_queue->head->thread;
 
@@ -107,6 +102,7 @@ void my_pthread_create(my_pthread_t *thread, void*(*function)(void*), void *arg)
 
   my_pthread_tcb tcb = {tid_counter, RUNNABLE, ucp, NULL};
   tcbs[tid_counter] = tcb;
+  *thread = tid_counter;
   enqueue(thread_queue, tid_counter);
   tid_counter++;
 
@@ -139,7 +135,7 @@ void my_pthread_join(my_pthread_t thread){
   sigaddset (&block_mask, SIGPROF);
   sigprocmask (SIG_BLOCK, &block_mask, NULL);
 
-  if (tcbs[thread].status != FINISHED) {
+  while (tcbs[thread].status != FINISHED) {
     my_pthread_yield();
   }
 
@@ -177,6 +173,14 @@ void my_pthread_exit(){
 }
 
 
+void print_queue(queue *q) {
+  queue_node *ptr = q->head;
+  while (ptr != NULL) {
+    printf("%d -> ", ptr->thread);
+    ptr = ptr->next;
+  }
+  printf("\n");
+}
 
 void queue_init(queue *q) {
 	q -> head = NULL;
