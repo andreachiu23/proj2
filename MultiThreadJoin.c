@@ -23,7 +23,7 @@ int main(){
     my_pthread_create(&threads[x], (void*) thread_run, (void*) NULL);
   }
 
-  for(x = 0; x < 9; x++){
+  for(x = 0; x < EXTRA_THREADS; x++){
     my_pthread_join(threads[x]);
   }
 

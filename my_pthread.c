@@ -8,7 +8,8 @@
 
 // static variables
 static my_pthread_t tid_counter = 0;
-static my_pthread_tcb tcbs[500];
+static my_pthread_tcb *tcbs;
+static int arr_size = 500;
 static int activated = -1;
 static struct sigaction sa;
 static struct itimerval timer;
@@ -82,6 +83,7 @@ void my_pthread_create(my_pthread_t *thread, void*(*function)(void*), void *arg)
     thread_queue = (queue*)malloc(sizeof(queue));
     queue_init(thread_queue);
     enqueue(thread_queue, tid_counter);
+    tcbs = malloc(arr_size * sizeof(my_pthread_tcb));
 
     my_pthread_tcb tcb = {tid_counter, RUNNABLE, main, NULL};
     tcbs[tid_counter] = tcb;
@@ -100,9 +102,25 @@ void my_pthread_create(my_pthread_t *thread, void*(*function)(void*), void *arg)
   makecontext(&ucp, (void*)(function), 0);
 
   my_pthread_tcb tcb = {tid_counter, RUNNABLE, ucp, NULL};
+  // make sure array has enough room - if not, dynamically allocate more space
+  my_pthread_tcb *mem_test;
+  if ((tid_counter+1) > arr_size) {
+    mem_test = realloc(tcbs, (tid_counter+1) * sizeof(my_pthread_tcb));
+    if (!mem_test) {
+      fprintf(stderr, "ERROR: OUT OF MEMORY\n");
+      exit(0);
+    }
+    else {
+      tcbs = mem_test;
+      arr_size++;
+    }
+  }
+
+
   tcbs[tid_counter] = tcb;
   *thread = tid_counter;
   enqueue(thread_queue, tid_counter);
+
   tid_counter++;
 
 }
